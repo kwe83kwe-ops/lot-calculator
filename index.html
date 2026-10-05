@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Size up a semi-truck parking lot: monthly profit, payback time, break-even occupancy and a deal verdict.">
+<title>Park &amp; Profit Lot Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a truck-yard operator's console. Inputs on the left like a clipboard, live yard map + verdict on the right. */
+:root{
+  --bg:#ECEEEC;          /* poured concrete */
+  --surface:#FFFFFF;
+  --surface-2:#F5F6F4;
+  --fg:#1B2126;          /* asphalt */
+  --muted:#5B6670;
+  --line:#D3D8DA;
+  --accent:#D99A00;      /* lot striping paint */
+  --accent-ink:#8A6100;
+  --accent-soft:#FBEFCF;
+  --night:#3E5A73;       /* nightly trucks: steel blue */
+  --stall:#B9C1C5;
+  --good:#2E7D4F; --warn:#A86B12; --bad:#B3261E;
+  --good-soft:#E3F1E8; --warn-soft:#F8EBD5; --bad-soft:#F8E1DF;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141819;--surface:#1D2326;--surface-2:#242B2F;--fg:#E7EAEC;--muted:#9AA5AD;--line:#323B41;
+  --accent:#F2B42C;--accent-ink:#F2B42C;--accent-soft:#3A2F14;--night:#7FA3C4;--stall:#4A555C;
+  --good:#5BBF83;--warn:#E0A846;--bad:#EF6B5E;--good-soft:#1C3326;--warn-soft:#3A2E17;--bad-soft:#3D1F1C;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141819;--surface:#1D2326;--surface-2:#242B2F;--fg:#E7EAEC;--muted:#9AA5AD;--line:#323B41;
+  --accent:#F2B42C;--accent-ink:#F2B42C;--accent-soft:#3A2F14;--night:#7FA3C4;--stall:#4A555C;
+  --good:#5BBF83;--warn:#E0A846;--bad:#EF6B5E;--good-soft:#1C3326;--warn-soft:#3A2E17;--bad-soft:#3D1F1C;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:20px;padding-block:28px 96px}
+.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Header */
+header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px}
+.brand{font-family:var(--display);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:14px;color:var(--accent-ink);display:flex;align-items:center;gap:10px}
+.brand::before{content:"";width:28px;height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 8px,transparent 8px 12px)}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(34px,5vw,52px);line-height:1;margin:6px 0 6px;text-wrap:balance;letter-spacing:.005em}
+.lede{color:var(--muted);margin:0;max-width:60ch}
+.presets{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.presets .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);width:100%}
+.chip{font:inherit;font-size:13px;font-weight:600;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chip:focus-visible,button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Inputs */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.inputs details{border-bottom:1px solid var(--line)}
+.inputs details:last-child{border-bottom:0}
+.inputs summary{list-style:none;cursor:pointer;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:.02em;text-transform:uppercase}
+.inputs summary::-webkit-details-marker{display:none}
+.inputs summary .sum{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0}
+.inputs summary::after{content:"+";font-family:var(--mono);color:var(--muted);margin-left:10px}
+.inputs details[open] summary::after{content:"\2212"}
+.inputs summary>span:first-child{margin-right:auto}
+.fields{padding:2px 18px 18px;display:grid;gap:16px}
+.f label{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;font-weight:600;margin-bottom:6px}
+.f .hint{font-size:12px;color:var(--muted);margin-top:4px}
+.val{display:flex;align-items:center;gap:2px;font-family:var(--mono);font-size:13.5px}
+.val input{width:84px;text-align:right;font:inherit;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--fg)}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+.rowpair{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;font-size:13.5px}
+.rowpair input{width:110px;text-align:right;font-family:var(--mono);font-size:13.5px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--fg)}
+.cost{display:grid;grid-template-columns:minmax(0,1fr) 64px 92px;gap:8px;align-items:center;font-size:13px}
+.cost input{width:100%;text-align:right;font-family:var(--mono);font-size:13px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--fg)}
+.cost.head{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.cost.head span:not(:first-child){text-align:right}
+.subtotal{display:flex;justify-content:space-between;font-weight:700;border-top:1px dashed var(--line);padding-top:10px}
+
+/* Results */
+.results{display:grid;gap:22px;min-width:0}
+.verdict{padding:22px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;position:relative;overflow:hidden}
+.verdict::before{content:"";position:absolute;inset:0 auto 0 0;width:8px;background:var(--vcolor,var(--accent))}
+.verdict .eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.verdict .grade{font-family:var(--display);font-weight:700;font-size:clamp(30px,4.2vw,44px);line-height:1.05;color:var(--vcolor);margin:2px 0 6px}
+.verdict p{margin:0;max-width:56ch}
+.verdict .big{text-align:right}
+.verdict .big .n{font-family:var(--display);font-weight:700;font-size:clamp(38px,6vw,64px);line-height:1;font-variant-numeric:tabular-nums}
+.verdict .big .u{font-size:13px;color:var(--muted)}
+@media (max-width:560px){.verdict{grid-template-columns:minmax(0,1fr)}.verdict .big{text-align:left}}
+
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+@media (max-width:700px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);padding:14px 16px}
+.kpi .k{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.kpi .v{font-family:var(--mono);font-size:22px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--muted)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+.card h2{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.03em;font-size:21px;margin:0}
+.card .sub{color:var(--muted);font-size:13px;margin:2px 0 14px}
+.cardhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-start}
+
+/* Yard map */
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.yard{background:var(--surface-2);border-radius:8px;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(20px,1fr));gap:3px;row-gap:18px}
+.stall{aspect-ratio:1/3;border-left:2px solid var(--accent);position:relative;max-width:100%}
+.stall:nth-child(15n){border-right:2px solid var(--accent)}
+.stall svg{position:absolute;inset:6% 14%;width:72%;height:88%;transition:opacity .35s ease, transform .35s ease}
+.stall.empty svg{opacity:0;transform:translateY(-10%)}
+.stall.m svg{fill:var(--accent)}
+.stall.n svg{fill:var(--night)}
+.yard-note{font-size:12px;color:var(--muted);margin-top:8px}
+@media (prefers-reduced-motion:reduce){.stall svg{transition:none}}
+
+/* Chart */
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--mono);font-size:11px}
+.chart .zero{stroke:var(--fg);stroke-width:1}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .line{fill:none;stroke:var(--fg);stroke-width:2.25}
+.chart .pos{fill:var(--good);opacity:.16}
+.chart .neg{fill:var(--bad);opacity:.14}
+.chart .pb{stroke:var(--accent);stroke-width:2;stroke-dasharray:4 3}
+.chart .pbdot{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+.chart .pbtext{fill:var(--fg);font-weight:600}
+
+/* Breakdown */
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+@media (max-width:700px){.two{grid-template-columns:minmax(0,1fr)}}
+table.ledger{width:100%;border-collapse:collapse;font-size:14px}
+table.ledger td{padding:6px 0;border-bottom:1px solid var(--line)}
+table.ledger td:last-child{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+table.ledger tr.t td{font-weight:700;border-bottom:0;padding-top:10px}
+table.ledger tr.minus td:last-child{color:var(--muted)}
+.bar{height:10px;border-radius:5px;background:var(--surface-2);overflow:hidden;display:flex;margin:10px 0 4px}
+.bar span{display:block;height:100%}
+
+.stress{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.delta{margin-top:12px;font-size:14px}
+.delta b{font-family:var(--mono)}
+
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{font:inherit;font-weight:600;font-size:14px;padding:10px 16px;border-radius:8px;border:1px solid var(--fg);background:var(--fg);color:var(--bg);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+.toast{font-size:13px;color:var(--good)}
+textarea#copyfallback{width:100%;min-height:120px;font-family:var(--mono);font-size:12px;margin-top:10px;background:var(--surface-2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px}
+
+footer{margin-top:28px;font-size:12.5px;color:var(--muted);max-width:80ch}
+
+/* Mobile sticky result */
+.dock{display:none}
+@media (max-width:900px){
+  .dock{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:5;justify-content:space-between;align-items:center;gap:12px;
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg)}
+  .dock .n{font-family:var(--display);font-weight:700;font-size:26px;font-variant-numeric:tabular-nums}
+  .dock .g{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 10px;border-radius:999px;background:var(--vcolor,var(--accent));color:var(--surface)}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brand">Park &amp; Profit</div>
+      <h1>Truck Parking Lot Calculator</h1>
+      <p class="lede">Size up a lot before you sign anything. Move the sliders and watch the yard, the cash and the verdict update.</p>
+    </div>
+    <div class="presets" role="group" aria-label="Sample scenarios">
+      <span class="lbl">Load a sample scenario</span>
+      <button class="chip" data-preset="starter" type="button">3-acre starter lot</button>
+      <button class="chip" data-preset="rural" type="button">Rural interstate exit</button>
+      <button class="chip" data-preset="metro" type="button">Metro freight hub</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- INPUTS -->
+    <form class="panel inputs" id="form" autocomplete="off">
+      <details open>
+        <summary><span>The lot</span><span class="sum" id="sum-lot"></span></summary>
+        <div class="fields" id="f-lot"></div>
+      </details>
+      <details open>
+        <summary><span>Prices &amp; occupancy</span><span class="sum" id="sum-price"></span></summary>
+        <div class="fields" id="f-price"></div>
+      </details>
+      <details>
+        <summary><span>Monthly expenses</span><span class="sum" id="sum-exp"></span></summary>
+        <div class="fields" id="f-exp"></div>
+      </details>
+      <details>
+        <summary><span>Setup costs</span><span class="sum" id="sum-setup"></span></summary>
+        <div class="fields" id="f-setup"></div>
+      </details>
+      <details>
+        <summary><span>Growth &amp; ramp-up</span><span class="sum" id="sum-growth"></span></summary>
+        <div class="fields" id="f-growth"></div>
+      </details>
+    </form>
+
+    <!-- RESULTS -->
+    <section class="results" aria-live="polite">
+      <div class="verdict" id="verdict">
+        <div>
+          <div class="eyebrow">Deal check</div>
+          <div class="grade" id="grade">—</div>
+          <p id="why"></p>
+        </div>
+        <div class="big">
+          <div class="n" id="bigProfit">—</div>
+          <div class="u">net profit per month</div>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="k">Yearly profit</div><div class="v" id="k-year">—</div><div class="s">before income tax</div></div>
+        <div class="kpi"><div class="k">Payback</div><div class="v" id="k-pay">—</div><div class="s" id="k-pay-s">once the lot is full</div></div>
+        <div class="kpi"><div class="k">Cash-on-cash</div><div class="v" id="k-roi">—</div><div class="s">yearly return on setup</div></div>
+        <div class="kpi"><div class="k">Break-even</div><div class="v" id="k-be">—</div><div class="s">occupancy to cover costs</div></div>
+      </div>
+
+      <div class="card">
+        <div class="cardhead">
+          <div>
+            <h2>Your yard tonight</h2>
+            <div class="sub" id="yardSub"></div>
+          </div>
+          <div class="legend">
+            <span><i style="background:var(--accent)"></i>Monthly tenant</span>
+            <span><i style="background:var(--night)"></i>Nightly driver</span>
+            <span><i style="border:1px dashed var(--stall)"></i>Open stall</span>
+          </div>
+        </div>
+        <div class="yard" id="yard" aria-hidden="true"></div>
+        <div class="yard-note" id="yardNote"></div>
+      </div>
+
+      <div class="card">
+        <h2>Five years of cash</h2>
+        <div class="sub" id="chartSub">Starts at minus your setup cost. Where the line crosses zero, you've earned it all back.</div>
+        <div style="overflow-x:auto"><svg class="chart" id="chart" viewBox="0 0 720 280" role="img" aria-label="Cumulative cash over five years"></svg></div>
+      </div>
+
+      <div class="two">
+        <div class="card">
+          <h2>Where the money goes</h2>
+          <div class="sub">One typical month once the lot is up and running.</div>
+          <table class="ledger" id="ledger"></table>
+          <div class="bar" id="splitBar"></div>
+          <div class="legend" id="splitLegend"></div>
+        </div>
+        <div class="card">
+          <h2>Stress test</h2>
+          <div class="sub">Lenders and partners will ask. Check whether the deal survives a bad year.</div>
+          <div class="stress" role="group" aria-label="Stress tests">
+            <button class="chip" type="button" data-stress="occ" aria-pressed="false">Occupancy drops 20%</button>
+            <button class="chip" type="button" data-stress="ins" aria-pressed="false">Insurance doubles</button>
+            <button class="chip" type="button" data-stress="rent" aria-pressed="false">Rent rises 25%</button>
+            <button class="chip" type="button" data-stress="price" aria-pressed="false">Price war: rates down 15%</button>
+          </div>
+          <div class="delta" id="delta">Turn on a scenario to see what changes.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Save your numbers</h2>
+        <div class="sub">Copy a summary to paste into notes, a text to a partner, or an email to your banker.</div>
+        <div class="actions">
+          <button class="btn" type="button" id="copyBtn">Copy summary</button>
+          <button class="btn ghost" type="button" id="resetBtn">Reset to starter lot</button>
+          <span class="toast" id="toast" role="status"></span>
+        </div>
+        <textarea id="copyfallback" hidden readonly aria-label="Summary text"></textarea>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    Bonus tool from <strong>Park &amp; Profit: How to Invest in Your First Semi-Truck Parking Lot</strong>.
+    For education and planning only. This is not financial, legal or tax advice. Results depend entirely on the numbers you enter.
+    Get real quotes and talk to a CPA, attorney and insurance agent before you invest. Your numbers are saved in this browser only.
+  </footer>
+</div>
+
+<div class="dock" id="dock"><div><div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.08em">Net per month</div><div class="n" id="dockN">—</div></div><span class="g" id="dockG">—</span></div>
+
+<script>
+(function(){
+"use strict";
+var NIGHTS = 30, MAX_STALLS = 150, KEY = "pp-lot-calc-v1";
+
+var STARTER = {
+  acres:3, perAcre:15, shareM:80,
+  priceM:200, occM:85, priceN:25, occN:60, other:0, appFee:15, cardFee:3,
+  lease:3000, insurance:600, tax:0, utilities:350, maint:300, helper:400, software:150, marketing:100, otherExp:100,
+  c_surface_q:3, c_surface_u:10000, c_fence_q:1450, c_fence_u:25, c_lights_q:4, c_lights_u:4500,
+  c_cams_q:1, c_cams_u:6000, c_gate_q:1, c_gate_u:12000, c_signs_q:1, c_signs_u:1000,
+  c_permits_q:1, c_permits_u:6000, c_legal_q:1, c_legal_u:2000, c_mkt_q:1, c_mkt_u:1000, c_other_q:0, c_other_u:0,
+  contingency:10, ramp1:60, ramp2:85, priceGrowth:3, expGrowth:3
+};
+var PRESETS = {
+  starter: STARTER,
+  rural: Object.assign({}, STARTER, {acres:2, perAcre:18, shareM:40, priceM:150, occM:80, priceN:18, occN:55,
+    lease:1200, insurance:450, utilities:250, maint:250, helper:250, marketing:75, otherExp:75,
+    c_surface_q:2, c_surface_u:8000, c_fence_q:1200, c_fence_u:22, c_lights_q:3, c_lights_u:4000, c_gate_u:9000, c_permits_u:3500}),
+  metro: Object.assign({}, STARTER, {acres:4, perAcre:16, shareM:85, priceM:325, occM:90, priceN:35, occN:70,
+    lease:7500, insurance:950, utilities:500, maint:450, helper:800, software:200, marketing:150, otherExp:150,
+    c_surface_q:4, c_surface_u:15000, c_fence_q:1700, c_fence_u:32, c_lights_q:6, c_lights_u:6000,
+    c_cams_u:10000, c_gate_u:18000, c_permits_u:15000, c_legal_u:3500})
+};
+
+/* field definitions */
+var LOT = [
+  {id:"acres", label:"Usable acres", min:0.5, max:20, step:0.5, fmt:"num1", hint:"Land you can park on. Leave out ditches and setbacks."},
+  {id:"perAcre", label:"Truck spaces per acre", min:8, max:30, step:1, fmt:"int", hint:"Plan on 15–25. Pull-through stalls fit fewer."},
+  {id:"shareM", label:"Spaces rented monthly", min:0, max:100, step:5, fmt:"pct", hint:"The rest are sold by the night."}
+];
+var PRICE = [
+  {id:"priceM", label:"Monthly rate per space", min:50, max:600, step:5, fmt:"usd", hint:"Typical: $150–$400+ for tractor and trailer."},
+  {id:"occM", label:"Monthly stalls rented", min:0, max:100, step:1, fmt:"pct"},
+  {id:"priceN", label:"Nightly rate per space", min:5, max:60, step:1, fmt:"usd", hint:"Typical: $15–$35 a night."},
+  {id:"occN", label:"Nightly stalls filled (avg)", min:0, max:100, step:1, fmt:"pct"},
+  {id:"other", label:"Other income per month", min:0, max:5000, step:50, fmt:"usd", hint:"Trailer drops, reefer plug-ins, vending."},
+  {id:"appFee", label:"Booking app fee on nightly", min:0, max:30, step:1, fmt:"pct"},
+  {id:"cardFee", label:"Card processing fee", min:0, max:6, step:0.5, fmt:"pct1"}
+];
+var EXP = [
+  ["lease","Land lease or mortgage"],["insurance","Insurance"],["tax","Property tax"],
+  ["utilities","Power, internet, cameras"],["maint","Gravel, snow, trash"],["helper","Local helper"],
+  ["software","Booking & gate software"],["marketing","Marketing"],["otherExp","Other"]
+];
+var COSTS = [
+  ["c_surface","Gravel surface (acres)"],["c_fence","Fence (linear ft)"],["c_lights","Light poles"],
+  ["c_cams","Camera system"],["c_gate","Gate & access"],["c_signs","Signs"],
+  ["c_permits","Permits & engineering"],["c_legal","Legal & LLC"],["c_mkt","Launch marketing"],["c_other","Other"]
+];
+var GROWTH = [
+  {id:"ramp1", label:"Year 1: how full vs. target", min:10, max:100, step:5, fmt:"pct", hint:"New lots take time to fill."},
+  {id:"ramp2", label:"Year 2: how full vs. target", min:10, max:100, step:5, fmt:"pct"},
+  {id:"priceGrowth", label:"Yearly price increase", min:0, max:10, step:0.5, fmt:"pct1"},
+  {id:"expGrowth", label:"Yearly expense increase", min:0, max:10, step:0.5, fmt:"pct1"},
+  {id:"contingency", label:"Setup cushion for surprises", min:0, max:30, step:1, fmt:"pct"}
+];
+
+var S = load() || Object.assign({}, STARTER);
+var stress = {occ:false, ins:false, rent:false, price:false};
+
+/* formatting */
+function usd(n){ var s = Math.round(Math.abs(n)).toLocaleString("en-US"); return (n < -0.5 ? "−$" : "$") + s; }
+function usdK(n){ var a=Math.abs(n), s = a>=1e6 ? (a/1e6).toFixed(1)+"M" : a>=1e3 ? Math.round(a/1e3)+"k" : Math.round(a)+""; return (n<-0.5?"−$":"$")+s; }
+function pct(n,d){ return (n*100).toFixed(d||0)+"%"; }
+function fmtVal(f,v){
+  switch(f){case "usd":return "$"+v; case "pct":return v+"%"; case "pct1":return v+"%"; case "num1":return (+v).toFixed(1); default:return v;}
+}
+
+/* build form */
+function sliderField(d){
+  var w = document.createElement("div"); w.className = "f";
+  var pre = d.fmt==="usd" ? "$" : "", post = (d.fmt==="pct"||d.fmt==="pct1") ? "%" : "";
+  w.innerHTML = '<label for="r-'+d.id+'"><span>'+d.label+'</span><span class="val">'+pre+
+    '<input type="number" id="n-'+d.id+'" min="'+d.min+'" step="'+d.step+'" aria-label="'+d.label+'">'+post+'</span></label>'+
+    '<input type="range" id="r-'+d.id+'" min="'+d.min+'" max="'+d.max+'" step="'+d.step+'">'+
+    (d.hint ? '<div class="hint">'+d.hint+'</div>' : "");
+  var r = w.querySelector("input[type=range]"), n = w.querySelector("input[type=number]");
+  r.addEventListener("input", function(){ S[d.id] = +r.value; n.value = r.value; update(); });
+  n.addEventListener("input", function(){ var v = parseFloat(n.value); if (isNaN(v)) return; S[d.id] = Math.max(d.min, v); r.value = v; update(); });
+  return w;
+}
+function moneyRow(id,label){
+  var w = document.createElement("div"); w.className = "rowpair";
+  w.innerHTML = '<label for="e-'+id+'">'+label+'</label><input type="number" min="0" step="25" id="e-'+id+'">';
+  var i = w.querySelector("input");
+  i.addEventListener("input", function(){ var v = parseFloat(i.value); S[id] = isNaN(v) ? 0 : Math.max(0,v); update(); });
+  return w;
+}
+function costRow(id,label){
+  var w = document.createElement("div"); w.className = "cost";
+  w.innerHTML = '<label for="'+id+'_q">'+label+'</label><input type="number" min="0" id="'+id+'_q" aria-label="'+label+' quantity"><input type="number" min="0" step="100" id="'+id+'_u" aria-label="'+label+' cost each">';
+  ["_q","_u"].forEach(function(sfx){
+    var i = w.querySelector("#"+id+sfx);
+    i.addEventListener("input", function(){ var v = parseFloat(i.value); S[id+sfx] = isNaN(v)?0:Math.max(0,v); update(); });
+  });
+  return w;
+}
+function build(){
+  var lot = document.getElementById("f-lot"); LOT.forEach(function(d){ lot.appendChild(sliderField(d)); });
+  var pr = document.getElementById("f-price"); PRICE.forEach(function(d){ pr.appendChild(sliderField(d)); });
+  var ex = document.getElementById("f-exp"); EXP.forEach(function(e){ ex.appendChild(moneyRow(e[0], e[1])); });
+  var t = document.createElement("div"); t.className="subtotal"; t.innerHTML='<span>Total per month</span><span class="num" id="expTotal"></span>'; ex.appendChild(t);
+  var su = document.getElementById("f-setup");
+  var h = document.createElement("div"); h.className="cost head"; h.innerHTML="<span>Item</span><span>Qty</span><span>Each ($)</span>"; su.appendChild(h);
+  COSTS.forEach(function(c){ su.appendChild(costRow(c[0], c[1])); });
+  var t2 = document.createElement("div"); t2.className="subtotal"; t2.innerHTML='<span>Total with cushion</span><span class="num" id="setupTotal"></span>'; su.appendChild(t2);
+  var gr = document.getElementById("f-growth"); GROWTH.forEach(function(d){ gr.appendChild(sliderField(d)); });
+  // stalls
+  var yard = document.getElementById("yard"), truck = '<svg viewBox="0 0 20 60"><rect x="4" y="1" width="12" height="11" rx="3"/><rect x="2.5" y="14" width="15" height="45" rx="1.5"/></svg>';
+  var html = ""; for (var i=0;i<MAX_STALLS;i++) html += '<div class="stall empty">'+truck+'</div>';
+  yard.innerHTML = html;
+}
+function syncInputs(){
+  LOT.concat(PRICE, GROWTH).forEach(function(d){
+    document.getElementById("r-"+d.id).value = S[d.id];
+    document.getElementById("n-"+d.id).value = S[d.id];
+  });
+  EXP.forEach(function(e){ document.getElementById("e-"+e[0]).value = S[e[0]]; });
+  COSTS.forEach(function(c){ document.getElementById(c[0]+"_q").value = S[c[0]+"_q"]; document.getElementById(c[0]+"_u").value = S[c[0]+"_u"]; });
+}
+
+/* model */
+function model(s, st){
+  st = st || {};
+  var total = Math.floor(s.acres * s.perAcre);
+  var mSp = Math.round(total * s.shareM/100), nSp = total - mSp;
+  var occF = st.occ ? 0.8 : 1, prF = st.price ? 0.85 : 1;
+  var occM = Math.min(1, s.occM/100*occF), occN = Math.min(1, s.occN/100*occF);
+  var pM = s.priceM*prF, pN = s.priceN*prF, app = s.appFee/100, card = s.cardFee/100;
+  var revM = mSp*occM*pM, revN = nSp*occN*pN*NIGHTS, other = s.other;
+  var gross = revM + revN + other;
+  var appFees = revN*app, cardFees = gross*card, fees = appFees + cardFees;
+  var exp = EXP.reduce(function(a,e){ return a + (+s[e[0]]||0); }, 0);
+  if (st.ins) exp += s.insurance;
+  if (st.rent) exp += s.lease*0.25;
+  var profit = gross - fees - exp;
+  var setupSub = COSTS.reduce(function(a,c){ return a + (s[c[0]+"_q"]||0)*(s[c[0]+"_u"]||0); }, 0);
+  var setup = setupSub*(1 + s.contingency/100);
+  var full = mSp*pM*(1-card) + nSp*pN*NIGHTS*(1-app-card);
+  var be = full > 0 ? Math.max(0, (exp - other*(1-card)) / full) : Infinity;
+  var occAll = total ? (mSp*occM + nSp*occN)/total : 0;
+  // 60-month projection with ramp-up
+  var ramp = [s.ramp1/100, s.ramp2/100, 1, 1, 1], cum = -setup, series = [cum], payMonth = null;
+  for (var y=0;y<5;y++){
+    var g = Math.pow(1+s.priceGrowth/100, y), eg = Math.pow(1+s.expGrowth/100, y);
+    var rM = mSp*Math.min(1,occM*ramp[y])*pM*g, rN = nSp*Math.min(1,occN*ramp[y])*pN*g*NIGHTS, oth = other*ramp[y]*g;
+    var gr = rM+rN+oth, fe = rN*app + gr*card, mp = gr - fe - exp*eg;
+    for (var m=0;m<12;m++){ cum += mp; series.push(cum); if (payMonth===null && cum >= 0) payMonth = y*12+m+1; }
+  }
+  return {total:total, mSp:mSp, nSp:nSp, occM:occM, occN:occN, revM:revM, revN:revN, other:other, gross:gross,
+    appFees:appFees, cardFees:cardFees, fees:fees, exp:exp, profit:profit, year:profit*12, setup:setup,
+    payback: profit>0 ? setup/profit : null, roi: setup>0 ? profit*12/setup : 0, be:be, occAll:occAll,
+    series:series, payMonth:payMonth, fiveYear:series[60]+setup};
+}
+
+function verdict(r){
+  if (r.total === 0) return {g:"Add some land", c:"var(--muted)", why:"Set your acres and spaces per acre to start."};
+  if (r.profit <= 0) return {g:"Losing money", c:"var(--bad)",
+    why:"Expenses are higher than what the lot brings in. Find cheaper land, raise rates, or plan to fill more stalls."};
+  var pb = r.payback, be = r.be;
+  if (pb <= 36 && be <= 0.6) return {g:"Strong deal", c:"var(--good)",
+    why:"You earn back the setup cost in about "+Math.round(pb)+" months, and the lot covers its bills at just "+pct(be)+" full. That leaves room for a slow year."};
+  if (pb <= 60 && be <= 0.8) return {g:"Workable deal", c:"var(--warn)",
+    why:"Payback in about "+Math.round(pb)+" months, and you break even at "+pct(be)+" full. Solid if you can fill it. Try to lower the land cost or setup spend."};
+  return {g:"Thin margins", c:"var(--warn)",
+    why: (be > 0.8 ? "You need the lot "+pct(be)+" full just to break even, which leaves little room for mistakes. " : "") +
+         "Payback takes about "+Math.round(pb)+" months. Look for cheaper land or a site with existing gravel."};
+}
+
+/* render */
+var $ = function(id){ return document.getElementById(id); };
+function update(){
+  var r = model(S), v = verdict(r);
+  save();
+  // summaries
+  $("sum-lot").textContent = r.total + " spaces";
+  $("sum-price").textContent = pct(r.occAll) + " full";
+  $("sum-exp").textContent = usd(EXP.reduce(function(a,e){return a+(+S[e[0]]||0);},0)) + "/mo";
+  $("sum-setup").textContent = usdK(r.setup);
+  $("sum-growth").textContent = "Y1 " + S.ramp1 + "%";
+  $("expTotal").textContent = usd(EXP.reduce(function(a,e){return a+(+S[e[0]]||0);},0));
+  $("setupTotal").textContent = usd(r.setup);
+  // verdict
+  $("verdict").style.setProperty("--vcolor", v.c);
+  $("dock").style.setProperty("--vcolor", v.c);
+  $("grade").textContent = v.g; $("why").textContent = v.why;
+  $("bigProfit").textContent = usd(r.profit);
+  $("dockN").textContent = usd(r.profit); $("dockG").textContent = v.g;
+  // kpis
+  $("k-year").textContent = usd(r.year);
+  $("k-pay").textContent = r.payback ? (r.payback < 12 ? Math.round(r.payback)+" mo" : (r.payback/12).toFixed(1)+" yrs") : "Never";
+  $("k-pay-s").textContent = r.payMonth ? "with ramp-up: month " + r.payMonth : "not within 5 years";
+  $("k-roi").textContent = r.setup > 0 ? pct(r.roi) : "—";
+  $("k-be").textContent = isFinite(r.be) ? (r.be > 1 ? "Over 100%" : pct(r.be)) : "—";
+  // yard
+  var stalls = $("yard").children, shown = Math.min(r.total, MAX_STALLS), scale = r.total ? shown / r.total : 0;
+  var mFull = Math.round(r.mSp*r.occM*scale), mShown = Math.round(r.mSp*scale), nFull = Math.round(r.nSp*r.occN*scale);
+  for (var i=0;i<MAX_STALLS;i++){
+    var el = stalls[i];
+    if (i >= shown){ el.hidden = true; continue; }
+    el.hidden = false;
+    var cls = "stall ";
+    if (i < mShown) cls += i < mFull ? "m" : "empty";
+    else cls += (i - mShown) < nFull ? "n" : "empty";
+    el.className = cls;
+  }
+  $("yardSub").textContent = Math.round(r.mSp*r.occM) + " monthly tenants, " + Math.round(r.nSp*r.occN) + " nightly drivers, " + Math.round(r.total - r.mSp*r.occM - r.nSp*r.occN) + " open stalls";
+  $("yardNote").textContent = r.total > MAX_STALLS ? "Showing "+MAX_STALLS+" of "+r.total+" spaces, to scale." : "";
+  // chart, ledger, stress
+  drawChart(r); ledger(r); stressOut(r);
+}
+
+function niceStep(range){ var raw = range/4, p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw/p; return (m<1.5?1:m<3?2:m<7?5:10)*p; }
+function drawChart(r){
+  var W=720,H=280,L=64,R=20,T=18,B=34, s = r.series;
+  var lo = Math.min(0, Math.min.apply(null,s)), hi = Math.max(0, Math.max.apply(null,s));
+  if (hi === lo) hi = lo + 1;
+  var step = niceStep(hi-lo); lo = Math.floor(lo/step)*step; hi = Math.ceil(hi/step)*step;
+  var x = function(i){ return L + i*(W-L-R)/60; }, y = function(v){ return T + (hi - v)*(H-T-B)/(hi-lo); };
+  var g = "";
+  for (var v=lo; v<=hi+1e-6; v+=step){ g += '<line class="grid" x1="'+L+'" x2="'+(W-R)+'" y1="'+y(v)+'" y2="'+y(v)+'"/><text x="'+(L-8)+'" y="'+(y(v)+4)+'" text-anchor="end">'+usdK(v)+'</text>'; }
+  for (var yr=0; yr<=5; yr++){ g += '<text x="'+x(yr*12)+'" y="'+(H-12)+'" text-anchor="middle">'+(yr===0?"Open":"Yr "+yr)+'</text>'; }
+  var pts = s.map(function(v,i){ return x(i).toFixed(1)+","+y(v).toFixed(1); }).join(" ");
+  var y0 = y(0);
+  var area = "M"+x(0)+","+y0+" L"+pts.split(" ").join(" L")+" L"+x(60)+","+y0+" Z";
+  g += '<defs><clipPath id="cpPos"><rect x="0" y="0" width="'+W+'" height="'+y0+'"/></clipPath><clipPath id="cpNeg"><rect x="0" y="'+y0+'" width="'+W+'" height="'+(H-y0)+'"/></clipPath></defs>';
+  g += '<path class="pos" clip-path="url(#cpPos)" d="'+area+'"/><path class="neg" clip-path="url(#cpNeg)" d="'+area+'"/>';
+  g += '<line class="zero" x1="'+L+'" x2="'+(W-R)+'" y1="'+y0+'" y2="'+y0+'"/>';
+  g += '<polyline class="line" points="'+pts+'"/>';
+  if (r.payMonth){
+    var px = x(r.payMonth), anchor = r.payMonth > 44 ? "end" : "start", off = r.payMonth > 44 ? -8 : 8;
+    g += '<line class="pb" x1="'+px+'" x2="'+px+'" y1="'+T+'" y2="'+(H-B)+'"/><circle class="pbdot" cx="'+px+'" cy="'+y0+'" r="5"/>';
+    g += '<text class="pbtext" x="'+(px+off)+'" y="'+(T+12)+'" text-anchor="'+anchor+'">Paid back: month '+r.payMonth+'</text>';
+  }
+  var endY = y(s[60]); g += '<circle cx="'+x(60)+'" cy="'+endY+'" r="4" fill="var(--fg)"/>';
+  g += '<text class="pbtext" x="'+(x(60)-8)+'" y="'+(endY + (s[60] >= 0 ? -10 : 18))+'" text-anchor="end">'+usdK(s[60])+' after 5 yrs</text>';
+  $("chart").innerHTML = g;
+  $("chartSub").textContent = r.payMonth
+    ? "You put in "+usd(r.setup)+". Counting the slow first years, you have it all back in month "+r.payMonth+" and are up "+usd(s[60])+" by year five."
+    : "You put in "+usd(r.setup)+". At these numbers, the lot does not earn it back within five years.";
+}
+
+function ledger(r){
+  var rows = [
+    ["Monthly tenants", r.revM], ["Nightly drivers", r.revN]
+  ];
+  if (r.other) rows.push(["Other income", r.other]);
+  var h = rows.map(function(x){ return "<tr><td>"+x[0]+"</td><td>"+usd(x[1])+"</td></tr>"; }).join("");
+  h += '<tr class="minus"><td>App &amp; card fees</td><td>'+usd(-r.fees)+'</td></tr>';
+  h += '<tr class="minus"><td>Operating expenses</td><td>'+usd(-r.exp)+'</td></tr>';
+  h += '<tr class="t"><td>You keep</td><td>'+usd(r.profit)+'</td></tr>';
+  $("ledger").innerHTML = h;
+  var g = Math.max(r.gross, 1), keep = Math.max(0, r.profit);
+  var parts = [["Land","var(--muted)", +S.lease], ["Other costs","var(--stall)", r.exp - S.lease], ["Fees","var(--night)", r.fees], ["You keep","var(--accent)", keep]];
+  var tot = parts.reduce(function(a,p){return a+Math.max(0,p[2]);},0) || 1;
+  $("splitBar").innerHTML = parts.map(function(p){ return '<span style="width:'+(Math.max(0,p[2])/tot*100)+'%;background:'+p[1]+'"></span>'; }).join("");
+  $("splitLegend").innerHTML = parts.map(function(p){ return '<span><i style="background:'+p[1]+'"></i>'+p[0]+" "+pct(Math.max(0,p[2])/tot)+'</span>'; }).join("");
+}
+
+function stressOut(base){
+  var any = Object.keys(stress).some(function(k){ return stress[k]; });
+  if (!any){ $("delta").textContent = "Turn on a scenario to see what changes."; return; }
+  var r = model(S, stress), v = verdict(r), d = r.profit - base.profit;
+  $("delta").innerHTML = 'Monthly profit goes from <b>'+usd(base.profit)+'</b> to <b>'+usd(r.profit)+'</b> ('+usd(d)+'). '+
+    (r.profit > 0 ? 'Still profitable. Payback stretches to about <b>'+Math.round(r.payback)+' months</b>. Verdict: <b>'+v.g+'</b>.'
+                  : 'The lot loses money in this scenario. Keep a cash reserve of at least <b>'+usd(Math.abs(r.profit)*6)+'</b> (six months of losses) before you open.');
+}
+
+/* summary copy */
+function summary(){
+  var r = model(S), v = verdict(r);
+  return ["PARK & PROFIT LOT CALCULATOR",
+    "Lot: "+S.acres+" acres, "+r.total+" spaces ("+r.mSp+" monthly / "+r.nSp+" nightly)",
+    "Rates: $"+S.priceM+"/mo, $"+S.priceN+"/night. Occupancy: "+S.occM+"% monthly, "+S.occN+"% nightly",
+    "Gross revenue: "+usd(r.gross)+"/mo",
+    "Expenses + fees: "+usd(r.exp + r.fees)+"/mo",
+    "Net profit: "+usd(r.profit)+"/mo ("+usd(r.year)+"/yr)",
+    "Setup cost: "+usd(r.setup),
+    "Payback: "+(r.payMonth ? "month "+r.payMonth+" (with ramp-up)" : "not within 5 years"),
+    "Cash-on-cash return: "+pct(r.roi),
+    "Break-even occupancy: "+(isFinite(r.be)?pct(r.be):"n/a"),
+    "Verdict: "+v.g].join("\n");
+}
+
+/* storage */
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function load(){ try{ var j = JSON.parse(localStorage.getItem(KEY)); return j ? Object.assign({}, STARTER, j) : null; }catch(e){ return null; } }
+
+/* wire up */
+build(); syncInputs(); update();
+document.querySelectorAll("[data-preset]").forEach(function(b){
+  b.addEventListener("click", function(){
+    S = Object.assign({}, PRESETS[b.dataset.preset]); syncInputs(); update();
+    document.querySelectorAll("[data-preset]").forEach(function(o){ o.setAttribute("aria-pressed", o===b ? "true" : "false"); });
+  });
+});
+document.querySelectorAll("[data-stress]").forEach(function(b){
+  b.addEventListener("click", function(){
+    var k = b.dataset.stress; stress[k] = !stress[k]; b.setAttribute("aria-pressed", String(stress[k])); update();
+  });
+});
+$("form").addEventListener("submit", function(e){ e.preventDefault(); });
+$("resetBtn").addEventListener("click", function(){ S = Object.assign({}, STARTER); syncInputs(); update(); });
+$("copyBtn").addEventListener("click", function(){
+  var t = summary(), fb = $("copyfallback");
+  function fallback(){ fb.hidden = false; fb.value = t; fb.focus(); fb.select(); $("toast").textContent = "Select all and copy the text below."; }
+  try{
+    navigator.clipboard.writeText(t).then(function(){ fb.hidden = true; $("toast").textContent = "Copied to clipboard"; setTimeout(function(){ $("toast").textContent = ""; }, 2500); }, fallback);
+  }catch(e){ fallback(); }
+});
+})();
+</script>
+</body>
+</html>
