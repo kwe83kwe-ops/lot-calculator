@@ -41,6 +41,7 @@
   color-scheme:dark}
 
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;margin:0}
 .wrap{max-width:1200px;margin:0 auto;padding-inline:20px;padding-block:28px 96px}
 .num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -166,6 +167,21 @@ footer{margin-top:28px;font-size:12.5px;color:var(--muted);max-width:80ch}
   .dock .n{font-family:var(--display);font-weight:700;font-size:26px;font-variant-numeric:tabular-nums}
   .dock .g{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 10px;border-radius:999px;background:var(--vcolor,var(--accent));color:var(--surface)}
 }
+
+/* Free preview: premium cards */
+.premium{position:relative}
+.premium.locked > :not(.lock){filter:blur(5px);opacity:.55;pointer-events:none;user-select:none}
+.lock{display:none}
+.premium.locked .lock{display:flex;position:absolute;inset:0;z-index:2;align-items:center;justify-content:center;padding:16px}
+.lock-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;max-width:380px;width:100%;box-shadow:0 8px 28px rgba(0,0,0,.12)}
+.lock-box .eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--accent-ink)}
+.lock-box h3{font-family:var(--display);font-weight:700;font-size:22px;margin:2px 0 6px;text-transform:uppercase;letter-spacing:.02em}
+.lock-box p{margin:0 0 12px;font-size:13.5px;color:var(--muted)}
+.lock-row{display:flex;gap:8px}
+.lock-row input{flex:1;min-width:0;font-family:var(--mono);font-size:14px;text-transform:uppercase;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--fg)}
+.lock-msg{font-size:12.5px;margin-top:8px;min-height:1em;color:var(--bad)}
+.lock-buy{display:inline-block;margin-top:10px;font-size:13.5px;font-weight:600;color:var(--accent-ink)}
+.pro-pill{display:inline-block;font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--accent);color:#1B2126;margin-left:10px;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -173,7 +189,7 @@ footer{margin-top:28px;font-size:12.5px;color:var(--muted);max-width:80ch}
 <div class="wrap">
   <header class="top">
     <div>
-      <div class="brand">Park &amp; Profit</div>
+      <div class="brand">Park &amp; Profit<span class="pro-pill" id="proPill" hidden>Full version</span></div>
       <h1>Truck Parking Lot Calculator</h1>
       <p class="lede">Size up a lot before you sign anything. Move the sliders and watch the yard, the cash and the verdict update.</p>
     </div>
@@ -247,7 +263,7 @@ footer{margin-top:28px;font-size:12.5px;color:var(--muted);max-width:80ch}
         <div class="yard-note" id="yardNote"></div>
       </div>
 
-      <div class="card">
+      <div class="card premium" data-feature="Five-year cash chart">
         <h2>Five years of cash</h2>
         <div class="sub" id="chartSub">Starts at minus your setup cost. Where the line crosses zero, you've earned it all back.</div>
         <div style="overflow-x:auto"><svg class="chart" id="chart" viewBox="0 0 720 280" role="img" aria-label="Cumulative cash over five years"></svg></div>
@@ -261,7 +277,7 @@ footer{margin-top:28px;font-size:12.5px;color:var(--muted);max-width:80ch}
           <div class="bar" id="splitBar"></div>
           <div class="legend" id="splitLegend"></div>
         </div>
-        <div class="card">
+        <div class="card premium" data-feature="Stress tests">
           <h2>Stress test</h2>
           <div class="sub">Lenders and partners will ask. Check whether the deal survives a bad year.</div>
           <div class="stress" role="group" aria-label="Stress tests">
@@ -488,7 +504,7 @@ function update(){
   // kpis
   $("k-year").textContent = usd(r.year);
   $("k-pay").textContent = r.payback ? (r.payback < 12 ? Math.round(r.payback)+" mo" : (r.payback/12).toFixed(1)+" yrs") : "Never";
-  $("k-pay-s").textContent = r.payMonth ? "with ramp-up: month " + r.payMonth : "not within 5 years";
+  $("k-pay-s").textContent = (typeof unlocked !== "undefined" && !unlocked) ? "once the lot is full" : (r.payMonth ? "with ramp-up: month " + r.payMonth : "not within 5 years");
   $("k-roi").textContent = r.setup > 0 ? pct(r.roi) : "—";
   $("k-be").textContent = isFinite(r.be) ? (r.be > 1 ? "Over 100%" : pct(r.be)) : "—";
   // yard
@@ -586,7 +602,84 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} 
 function load(){ try{ var j = JSON.parse(localStorage.getItem(KEY)); return j ? Object.assign({}, STARTER, j) : null; }catch(e){ return null; } }
 
 /* wire up */
-build(); syncInputs(); update();
+build(); syncInputs();
+/* ---- free preview / buyer unlock ----
+   Buyers find the code in the ebook. This is a light gate for a static site, not real security. */
+var UNLOCK_HASH = "97e484fd84d795a22313f79f1229e222496af939ef9d88a28f3fb4edaca45bf5";
+var UNLOCK_KEY = "pp-unlocked-v1";
+var STORE_URL = "";   /* set to your Etsy or Shopify product link to show a "Get the ebook" button */
+var unlocked = false;
+try { unlocked = localStorage.getItem(UNLOCK_KEY) === "1"; } catch(e){}
+function sha256js(str){
+  /* small pure-JS SHA-256, used when crypto.subtle is unavailable (e.g. some local-file views) */
+  function rr(v,a){ return (v>>>a)|(v<<(32-a)); }
+  var bytes = unescape(encodeURIComponent(str)), K = [], H = [], i, j, isP = {}, c = 0;
+  for (var cand = 2; c < 64; cand++){ if (!isP[cand]){ for (i = 0; i < 313; i += cand) isP[i] = cand;
+    H[c] = (Math.pow(cand, .5) * 4294967296) | 0; K[c++] = (Math.pow(cand, 1/3) * 4294967296) | 0; } }
+  H = H.slice(0, 8);
+  var bitLen = bytes.length * 8; bytes += "\x80";
+  while (bytes.length % 64 - 56) bytes += "\x00";
+  var W = [];
+  for (i = 0; i < bytes.length; i++){ j = bytes.charCodeAt(i); W[i >> 2] |= j << ((3 - i) % 4) * 8; }
+  W[W.length] = (bitLen / 4294967296) | 0; W[W.length] = bitLen;
+  for (j = 0; j < W.length;){
+    var w = W.slice(j, j += 16), old = H.slice(0);
+    for (i = 0; i < 64; i++){
+      var w15 = w[i - 15], w2 = w[i - 2], a = H[0], e = H[4];
+      var t1 = H[7] + (rr(e, 6) ^ rr(e, 11) ^ rr(e, 25)) + ((e & H[5]) ^ (~e & H[6])) + K[i] +
+        (w[i] = i < 16 ? w[i] : (w[i - 16] + (rr(w15, 7) ^ rr(w15, 18) ^ (w15 >>> 3)) + w[i - 7] + (rr(w2, 17) ^ rr(w2, 19) ^ (w2 >>> 10))) | 0);
+      var t2 = (rr(a, 2) ^ rr(a, 13) ^ rr(a, 22)) + ((a & H[1]) ^ (a & H[2]) ^ (H[1] & H[2]));
+      H = [(t1 + t2) | 0].concat(H); H[4] = (H[4] + t1) | 0; H.length = 8;
+    }
+    for (i = 0; i < 8; i++) H[i] = (H[i] + old[i]) | 0;
+  }
+  var out = ""; for (i = 0; i < 8; i++) for (j = 3; j + 1; j--){ var b = (H[i] >> (j * 8)) & 255; out += (b < 16 ? "0" : "") + b.toString(16); }
+  return out;
+}
+function sha256hex(text){
+  if (!(window.crypto && crypto.subtle)) return Promise.resolve(sha256js(text));
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(function(buf){
+    return Array.prototype.map.call(new Uint8Array(buf), function(b){ return ("0" + b.toString(16)).slice(-2); }).join("");
+  });
+}
+function tryCode(code){
+  code = String(code || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!code) return Promise.resolve(false);
+  return sha256hex(code).then(function(h){ return h === UNLOCK_HASH; });
+}
+function applyLock(){
+  document.querySelectorAll(".premium").forEach(function(c){ c.classList.toggle("locked", !unlocked); });
+  document.querySelectorAll("[data-stress]").forEach(function(b){ b.disabled = !unlocked; });
+  $("proPill").hidden = !unlocked;
+  if (!unlocked){ Object.keys(stress).forEach(function(k){ stress[k] = false; }); }
+  update();
+}
+function unlock(){ unlocked = true; try{ localStorage.setItem(UNLOCK_KEY, "1"); }catch(e){} applyLock(); }
+document.querySelectorAll(".premium").forEach(function(card, i){
+  var lock = document.createElement("div"); lock.className = "lock";
+  lock.innerHTML = '<div class="lock-box"><div class="eyebrow">Included with the ebook</div>' +
+    '<h3>' + card.dataset.feature + '</h3>' +
+    '<p>Bought Park &amp; Profit? Enter the unlock code from the Contents page of your ebook.</p>' +
+    '<form class="lock-row"><label class="visually-hidden" for="code' + i + '" hidden>Unlock code</label>' +
+    '<input id="code' + i + '" autocomplete="off" spellcheck="false" placeholder="Unlock code" aria-label="Unlock code">' +
+    '<button class="btn" type="submit">Unlock</button></form><div class="lock-msg" role="status"></div>' +
+    (STORE_URL ? '<a class="lock-buy" href="' + STORE_URL + '" target="_blank" rel="noopener">Get the ebook &rarr;</a>' : '') + '</div>';
+  card.appendChild(lock);
+  var form = lock.querySelector("form"), input = lock.querySelector("input"), msg = lock.querySelector(".lock-msg");
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    tryCode(input.value).then(function(ok){
+      if (ok) unlock(); else msg.textContent = "That code didn't work. Check the Contents page of your ebook and try again.";
+    });
+  });
+});
+applyLock();
+(function(){
+  var m = /[?&]unlock=([^&#]+)/.exec(location.search);
+  if (!m) return;
+  tryCode(decodeURIComponent(m[1])).then(function(ok){ if (ok) unlock(); });
+  try { history.replaceState(null, "", location.pathname + location.hash); } catch(e){}
+})();
 document.querySelectorAll("[data-preset]").forEach(function(b){
   b.addEventListener("click", function(){
     S = Object.assign({}, PRESETS[b.dataset.preset]); syncInputs(); update();
