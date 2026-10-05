@@ -607,7 +607,7 @@ build(); syncInputs();
    Buyers find the code in the ebook. This is a light gate for a static site, not real security. */
 var UNLOCK_HASH = "97e484fd84d795a22313f79f1229e222496af939ef9d88a28f3fb4edaca45bf5";
 var UNLOCK_KEY = "pp-unlocked-v1";
-var STORE_URL = "";   /* set to your Etsy or Shopify product link to show a "Get the ebook" button */
+var STORE_URL = "https://www.etsy.com/listing/4589322648";   /* set to your Etsy or Shopify product link to show a "Get the ebook" button */
 var unlocked = false;
 try { unlocked = localStorage.getItem(UNLOCK_KEY) === "1"; } catch(e){}
 function sha256js(str){
